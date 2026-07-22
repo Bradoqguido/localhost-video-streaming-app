@@ -129,6 +129,10 @@ class AndroidRtspStreamer : IRtspStreamer {
     
     // Set buffer size to standard 1280x720
     surfaceTexture.setDefaultBufferSize(1280, 720)
+    
+    // Configure rotation transform matrix on the TextureView
+    configureTransform(view.width, view.height)
+    
     val previewSurface = Surface(surfaceTexture)
 
     // ImageReader to capture YUV frames for HTTP streaming
@@ -450,5 +454,44 @@ class AndroidRtspStreamer : IRtspStreamer {
       Surface.ROTATION_270 -> 180
       else -> sensorOrientation
     }
+  }
+
+  private fun configureTransform(viewWidth: Int, viewHeight: Int) {
+    val view = textureView ?: return
+    val matrix = Matrix()
+    val viewRect = android.graphics.RectF(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
+    // 1280x720 output preview buffer size
+    val previewWidth = 1280f
+    val previewHeight = 720f
+    val bufferRect = android.graphics.RectF(0f, 0f, previewHeight, previewWidth)
+    val centerX = viewRect.centerX()
+    val centerY = viewRect.centerY()
+    
+    val rotation = getDisplayRotation()
+    if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
+      bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY())
+      matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL)
+      val scale = maxOf(
+        viewHeight.toFloat() / previewHeight,
+        viewWidth.toFloat() / previewWidth
+      )
+      matrix.postScale(scale, scale, centerX, centerY)
+      matrix.postRotate((90 * (rotation - 2)).toFloat(), centerX, centerY)
+    } else if (Surface.ROTATION_180 == rotation) {
+      matrix.postRotate(180f, centerX, centerY)
+    }
+    view.setTransform(matrix)
+  }
+
+  private fun getDisplayRotation(): Int {
+    val view = textureView ?: return Surface.ROTATION_0
+    val context = view.context
+    val display = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+      context.display
+    } else {
+      @Suppress("DEPRECATION")
+      (context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
+    }
+    return display?.rotation ?: Surface.ROTATION_0
   }
 }
