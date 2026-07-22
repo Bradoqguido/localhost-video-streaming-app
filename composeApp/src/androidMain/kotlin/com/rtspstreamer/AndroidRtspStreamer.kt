@@ -355,39 +355,62 @@ class AndroidRtspStreamer : IRtspStreamer {
   }
 
   private fun imageToJpeg(image: Image): ByteArray {
-    val planes = image.planes
-    val yBuffer = planes[0].buffer
-    val uBuffer = planes[1].buffer
-    val vBuffer = planes[2].buffer
+    val width = image.width
+    val height = image.height
+    val yPlane = image.planes[0]
+    val uPlane = image.planes[1]
+    val vPlane = image.planes[2]
 
-    val ySize = yBuffer.remaining()
-    val uSize = uBuffer.remaining()
-    val vSize = vBuffer.remaining()
+    val yBuffer = yPlane.buffer
+    val uBuffer = uPlane.buffer
+    val vBuffer = vPlane.buffer
 
-    val nv21 = ByteArray(ySize + uSize + vSize)
+    val yRowStride = yPlane.rowStride
+    val uRowStride = uPlane.rowStride
+    val vRowStride = vPlane.rowStride
 
-    yBuffer.get(nv21, 0, ySize)
+    val yPixelStride = yPlane.pixelStride
+    val uPixelStride = uPlane.pixelStride
+    val vPixelStride = vPlane.pixelStride
 
-    // Interleave VU bytes
-    val vBytes = ByteArray(vSize)
-    val uBytes = ByteArray(uSize)
-    vBuffer.get(vBytes)
-    uBuffer.get(uBytes)
+    val nv21 = ByteArray(width * height * 3 / 2)
 
-    var nv21Idx = ySize
-    val minSize = minOf(vBytes.size, uBytes.size)
-    for (i in 0 until minSize) {
-      if (nv21Idx < nv21.size) {
-        nv21[nv21Idx++] = vBytes[i]
+    // Copy Y plane
+    var nv21Idx = 0
+    val yRow = ByteArray(yRowStride)
+    for (row in 0 until height) {
+      yBuffer.position(row * yRowStride)
+      yBuffer.get(yRow, 0, yRowStride)
+      for (col in 0 until width) {
+        nv21[nv21Idx++] = yRow[col * yPixelStride]
       }
-      if (nv21Idx < nv21.size) {
-        nv21[nv21Idx++] = uBytes[i]
+    }
+
+    // Interleave VU plane (NV21 expects V, U, V, U...)
+    val uvWidth = width / 2
+    val uvHeight = height / 2
+    val uRow = ByteArray(uRowStride)
+    val vRow = ByteArray(vRowStride)
+
+    for (row in 0 until uvHeight) {
+      uBuffer.position(row * uRowStride)
+      uBuffer.get(uRow, 0, minOf(uRowStride, uBuffer.remaining()))
+      vBuffer.position(row * vRowStride)
+      vBuffer.get(vRow, 0, minOf(vRowStride, vBuffer.remaining()))
+
+      for (col in 0 until uvWidth) {
+        val uVal = uRow[col * uPixelStride]
+        val vVal = vRow[col * vPixelStride]
+        if (nv21Idx < nv21.size - 1) {
+          nv21[nv21Idx++] = vVal
+          nv21[nv21Idx++] = uVal
+        }
       }
     }
 
     val out = ByteArrayOutputStream()
-    val yuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
-    yuvImage.compressToJpeg(Rect(0, 0, image.width, image.height), 70, out)
+    val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
+    yuvImage.compressToJpeg(Rect(0, 0, width, height), 70, out)
     val rawJpeg = out.toByteArray()
 
     // Rotate frame to align upright based on device sensor orientation
