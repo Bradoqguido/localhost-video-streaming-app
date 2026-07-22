@@ -1,0 +1,21 @@
+*.iml
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+local.properties
+.idea
+.DS_Store
+*.hprof
+
+# NDI SDK (if ever added later)
+ndi-sdk/
+
+# Kotlin
+.kotlin/
+
+# iOS
+iosApp/Pods/
+iosApp/.build/
+
+.agent/
