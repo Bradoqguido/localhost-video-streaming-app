@@ -230,8 +230,8 @@ fun MainScreen(
             modifier = Modifier
               .size(36.dp)
               .clip(CircleShape)
-              .background(GlassWhite)
-              .border(1.dp, GlassBorder, CircleShape)
+              .background(Color(0x80000000))
+              .border(0.5.dp, Color(0x33FFFFFF), CircleShape)
           ) {
             Icon(
               imageVector = Icons.Default.Search,
@@ -250,8 +250,8 @@ fun MainScreen(
             modifier = Modifier
               .size(36.dp)
               .clip(CircleShape)
-              .background(GlassWhite)
-              .border(1.dp, GlassBorder, CircleShape)
+              .background(Color(0x80000000))
+              .border(0.5.dp, Color(0x33FFFFFF), CircleShape)
           ) {
             Icon(
               imageVector = Icons.Default.WbSunny,
@@ -270,8 +270,8 @@ fun MainScreen(
             modifier = Modifier
               .size(36.dp)
               .clip(CircleShape)
-              .background(GlassWhite)
-              .border(1.dp, GlassBorder, CircleShape)
+              .background(Color(0x80000000))
+              .border(0.5.dp, Color(0x33FFFFFF), CircleShape)
           ) {
             Icon(
               imageVector = if (isFlashlightOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
@@ -287,8 +287,8 @@ fun MainScreen(
             modifier = Modifier
               .size(36.dp)
               .clip(CircleShape)
-              .background(GlassWhite)
-              .border(1.dp, GlassBorder, CircleShape)
+              .background(Color(0x80000000))
+              .border(0.5.dp, Color(0x33FFFFFF), CircleShape)
           ) {
             Icon(
               imageVector = Icons.Default.Settings,
