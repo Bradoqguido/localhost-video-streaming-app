@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -368,6 +369,10 @@ private fun VerticalSliderBubble(
   onValueChange: (Float) -> Unit,
   valueRange: ClosedFloatingPointRange<Float> = 0f..1f
 ) {
+  val updatedValue by rememberUpdatedState(value)
+  val updatedRange by rememberUpdatedState(valueRange)
+  val updatedOnValueChange by rememberUpdatedState(onValueChange)
+
   Column(
     horizontalAlignment = Alignment.CenterHorizontally,
     modifier = Modifier
@@ -392,23 +397,23 @@ private fun VerticalSliderBubble(
         .height(130.dp)
         .clip(RoundedCornerShape(9.dp))
         .background(Color(0x33FFFFFF))
-        .pointerInput(valueRange, value) {
+        .pointerInput(Unit) { // Static key prevents resetting during drag
           detectDragGestures { change, dragAmount ->
             change.consume()
             val height = size.height
             val delta = -dragAmount.y / height
-            val rangeSpan = valueRange.endInclusive - valueRange.start
-            val newValue = (value + delta * rangeSpan).coerceIn(valueRange.start, valueRange.endInclusive)
-            onValueChange(newValue)
+            val rangeSpan = updatedRange.endInclusive - updatedRange.start
+            val newValue = (updatedValue + delta * rangeSpan).coerceIn(updatedRange.start, updatedRange.endInclusive)
+            updatedOnValueChange(newValue)
           }
         }
-        .pointerInput(valueRange) {
+        .pointerInput(Unit) { // Static key prevents resetting during tap
           detectTapGestures { offset ->
             val height = size.height
             val ratio = 1f - (offset.y / height)
-            val rangeSpan = valueRange.endInclusive - valueRange.start
-            val newValue = (valueRange.start + ratio * rangeSpan).coerceIn(valueRange.start, valueRange.endInclusive)
-            onValueChange(newValue)
+            val rangeSpan = updatedRange.endInclusive - updatedRange.start
+            val newValue = (updatedRange.start + ratio * rangeSpan).coerceIn(updatedRange.start, updatedRange.endInclusive)
+            updatedOnValueChange(newValue)
           }
         }
     ) {
