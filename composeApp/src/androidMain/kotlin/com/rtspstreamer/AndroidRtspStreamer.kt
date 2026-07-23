@@ -56,6 +56,8 @@ class AndroidRtspStreamer : IRtspStreamer {
   private var serverSocket: ServerSocket? = null
   private val clients = ConcurrentHashMap<UUID, Socket>()
   private var isStreaming = false
+  private var isFlashlightOn = false
+  private var currentZoomLevel = 0f
 
   private val _state = MutableStateFlow<StreamState>(StreamState.Idle)
   override val state: StateFlow<StreamState> = _state.asStateFlow()
@@ -189,6 +191,8 @@ class AndroidRtspStreamer : IRtspStreamer {
           builder.addTarget(reader.surface)
           builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
           
+          applyZoomAndFlashlight(builder, camera.id, view.context)
+          
           session.setRepeatingRequest(builder.build(), null, cameraHandler)
           _state.value = StreamState.Previewing
         } catch (e: Exception) {
@@ -313,43 +317,46 @@ class AndroidRtspStreamer : IRtspStreamer {
   }
 
   override fun setFlashlightEnabled(enabled: Boolean) {
-    val view = textureView ?: return
-    val context = view.context
-    val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-    try {
-      val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
-        val chars = cameraManager.getCameraCharacteristics(id)
-        chars.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
-      }
-      if (cameraId != null) {
-        cameraManager.setTorchMode(cameraId, enabled)
-      }
-    } catch (e: Exception) {
-      Log.e(TAG, "Error setting flashlight mode", e)
-    }
+    isFlashlightOn = enabled
+    updateRepeatingRequest()
   }
 
   override fun setZoom(level: Float) {
+    currentZoomLevel = level
+    updateRepeatingRequest()
+  }
+
+  private fun updateRepeatingRequest() {
     val session = captureSession ?: return
     val camera = cameraDevice ?: return
     try {
       val builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
       val view = textureView ?: return
       val surfaceTexture = view.surfaceTexture ?: return
-      surfaceTexture.setDefaultBufferSize(1280, 720)
       val previewSurface = Surface(surfaceTexture)
       val reader = imageReader ?: return
       builder.addTarget(previewSurface)
       builder.addTarget(reader.surface)
       builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
       
-      val manager = view.context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-      val characteristics = manager.getCameraCharacteristics(camera.id)
+      applyZoomAndFlashlight(builder, camera.id, view.context)
+      
+      session.setRepeatingRequest(builder.build(), null, cameraHandler)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error updating repeating request", e)
+    }
+  }
+
+  private fun applyZoomAndFlashlight(builder: CaptureRequest.Builder, cameraId: String, context: Context) {
+    // Zoom
+    try {
+      val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+      val characteristics = manager.getCameraCharacteristics(cameraId)
       val activeRect = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
       val maxZoom = characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1.0f
       
       if (activeRect != null) {
-        val currentZoom = 1.0f + (maxZoom - 1.0f) * level
+        val currentZoom = 1.0f + (maxZoom - 1.0f) * currentZoomLevel
         val centerX = activeRect.centerX()
         val centerY = activeRect.centerY()
         val deltaX = (activeRect.width() / (2.0f * currentZoom)).toInt()
@@ -358,11 +365,15 @@ class AndroidRtspStreamer : IRtspStreamer {
         val cropRect = Rect(centerX - deltaX, centerY - deltaY, centerX + deltaX, centerY + deltaY)
         builder.set(CaptureRequest.SCALER_CROP_REGION, cropRect)
       }
-      
-      session.setRepeatingRequest(builder.build(), null, cameraHandler)
     } catch (e: Exception) {
-      Log.e(TAG, "Zoom failed", e)
+      Log.e(TAG, "Error applying zoom", e)
     }
+
+    // Flashlight
+    builder.set(
+      CaptureRequest.FLASH_MODE,
+      if (isFlashlightOn) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF
+    )
   }
 
   override fun setScreenBrightness(level: Float) {

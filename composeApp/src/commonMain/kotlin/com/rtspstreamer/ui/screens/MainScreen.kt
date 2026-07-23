@@ -3,8 +3,8 @@ package com.rtspstreamer.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
@@ -56,10 +57,11 @@ import com.rtspstreamer.ui.theme.GlassBorder
 import com.rtspstreamer.ui.theme.GlassWhite
 import com.rtspstreamer.ui.theme.LiveGreen
 import com.rtspstreamer.ui.theme.LiveRed
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Main screen: full-screen camera preview with a minimal landscape top HUD,
- * vertical zoom slider, screen brightness controllers, flashlight toggle, and a level stability bar.
+ * vertical pop-up sliders for zoom and screen brightness, flashlight toggle, and a centered crosshair stability level.
  */
 @Composable
 fun MainScreen(
@@ -76,6 +78,7 @@ fun MainScreen(
   // HUD local states
   var isFlashlightOn by remember { mutableStateOf(false) }
   var showBrightnessSlider by remember { mutableStateOf(false) }
+  var showZoomSlider by remember { mutableStateOf(false) }
   var brightnessLevel by remember { mutableStateOf(0.7f) }
   var zoomLevel by remember { mutableStateOf(0f) }
 
@@ -98,94 +101,48 @@ fun MainScreen(
       modifier = Modifier.fillMaxSize(),
     )
 
-    // ── Left Side: Vertical Zoom Slider (positioned below the URI field) ──
-    Column(
-      modifier = Modifier
-        .align(Alignment.TopStart)
-        .statusBarsPadding()
-        .padding(start = 16.dp, top = 72.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
+    // ── Center Screen: Stability Level Crosshair ──
+    Box(
+      modifier = Modifier.align(Alignment.Center),
+      contentAlignment = Alignment.Center
     ) {
-      Text(
-        text = "ZOOM",
-        color = Color.White.copy(alpha = 0.6f),
-        fontSize = 9.sp,
-        fontWeight = FontWeight.Bold
-      )
-      Spacer(modifier = Modifier.height(4.dp))
+      // Thin leveling line
       Box(
         modifier = Modifier
-          .height(150.dp)
-          .width(36.dp)
-          .clip(RoundedCornerShape(18.dp))
-          .background(Color(0x33000000))
-          .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp)),
-        contentAlignment = Alignment.Center
-      ) {
-        Slider(
-          value = zoomLevel,
-          onValueChange = {
-            zoomLevel = it
-            streamer.setZoom(it)
-          },
-          valueRange = 0f..1f,
-          colors = SliderDefaults.colors(
-            thumbColor = Color.White,
-            activeTrackColor = Color.White,
-            inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-          ),
-          modifier = Modifier
-            .graphicsLayer { rotationZ = -90f }
-            .width(120.dp)
-        )
-      }
-    }
-
-    // ── Center Bottom: Level/Stability Bar ──
-    Column(
-      modifier = Modifier
-        .align(Alignment.BottomCenter)
-        .padding(bottom = 24.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      Text(
-        text = if (isStable) "LEVEL STABLE" else "TILTED",
-        color = if (isStable) Color(0xFFFFD700) else Color.White.copy(alpha = 0.5f),
-        fontSize = 9.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.sp
+          .width(140.dp)
+          .height(1.5.dp)
+          .background(if (isStable) Color(0xFFFFD700) else Color.White.copy(alpha = 0.3f))
       )
-      Spacer(modifier = Modifier.height(6.dp))
-      Box(
-        modifier = Modifier
-          .width(120.dp)
-          .height(6.dp)
-          .clip(RoundedCornerShape(3.dp))
-          .background(Color(0x44000000))
-          .border(0.5.dp, Color(0x44FFFFFF), RoundedCornerShape(3.dp))
-          .padding(1.dp)
+      // Side tick marks
+      Row(
+        modifier = Modifier.width(156.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
       ) {
         Box(
           modifier = Modifier
-            .fillMaxSize()
-            .clip(RoundedCornerShape(2.dp))
-            .background(if (isStable) Color(0xFFFFD700) else Color.White.copy(alpha = 0.4f))
+            .size(2.dp, 8.dp)
+            .background(if (isStable) Color(0xFFFFD700) else Color.White.copy(alpha = 0.3f))
+        )
+        Box(
+          modifier = Modifier
+            .size(2.dp, 8.dp)
+            .background(if (isStable) Color(0xFFFFD700) else Color.White.copy(alpha = 0.3f))
         )
       }
     }
 
-    // ── Top minimal HUD ──
+    // ── Minimal Top HUD Row ──
     Row(
       modifier = Modifier
         .fillMaxWidth()
         .statusBarsPadding()
         .padding(horizontal = 16.dp, vertical = 12.dp),
       horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
+      verticalAlignment = Alignment.Top
     ) {
       // ── Left Side: URL & FPS info ──
       Box(
-        modifier = Modifier.weight(1f, fill = false)
+        modifier = Modifier.padding(top = 4.dp)
       ) {
         if (state is StreamState.Streaming) {
           val streamUrl = (state as StreamState.Streaming).rtspUrl
@@ -199,7 +156,6 @@ fun MainScreen(
               .border(0.5.dp, Color(0x44FFFFFF), RoundedCornerShape(8.dp))
               .padding(horizontal = 10.dp, vertical = 6.dp)
           ) {
-            // URL label (click to copy)
             Row(
               modifier = Modifier.clickable { onCopyUrl(streamUrl) },
               verticalAlignment = Alignment.CenterVertically
@@ -229,7 +185,6 @@ fun MainScreen(
             )
             Spacer(modifier = Modifier.width(8.dp))
 
-            // FPS indicator
             Text(
               text = "${((fpsVal * 10).toInt() / 10f)} FPS",
               color = LiveGreen,
@@ -238,7 +193,6 @@ fun MainScreen(
             )
           }
         } else {
-          // Idle / Previewing State label
           Text(
             text = "Ready to Stream",
             color = Color.White.copy(alpha = 0.8f),
@@ -252,49 +206,41 @@ fun MainScreen(
         }
       }
 
-      // ── Right Side: Settings, Brightness, Flashlight & Start/Stop controls ──
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      // ── Right Side Controls and Pop-up Sliders Drawer ──
+      Column(
+        horizontalAlignment = Alignment.End
       ) {
-        // Brightness Expandable Slider
+        // Buttons Row with 12.dp spacing
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(4.dp)
+          horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-          AnimatedVisibility(
-            visible = showBrightnessSlider,
-            enter = expandHorizontally(),
-            exit = shrinkHorizontally()
+          // Zoom magnifier Button
+          IconButton(
+            onClick = {
+              showZoomSlider = !showZoomSlider
+              showBrightnessSlider = false
+            },
+            modifier = Modifier
+              .size(36.dp)
+              .clip(CircleShape)
+              .background(GlassWhite)
+              .border(1.dp, GlassBorder, CircleShape)
           ) {
-            Box(
-              modifier = Modifier
-                .width(100.dp)
-                .height(36.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(Color(0x77000000))
-                .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(18.dp))
-                .padding(horizontal = 12.dp),
-              contentAlignment = Alignment.Center
-            ) {
-              Slider(
-                value = brightnessLevel,
-                onValueChange = {
-                  brightnessLevel = it
-                  streamer.setScreenBrightness(it)
-                },
-                valueRange = 0.1f..1.0f,
-                colors = SliderDefaults.colors(
-                  thumbColor = Color.White,
-                  activeTrackColor = Color.White,
-                  inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                )
-              )
-            }
+            Icon(
+              imageVector = Icons.Default.Search,
+              contentDescription = "Camera Zoom",
+              tint = if (showZoomSlider) Color(0xFFFFD700) else Color.White,
+              modifier = Modifier.size(18.dp)
+            )
           }
 
+          // Brightness Sun Button
           IconButton(
-            onClick = { showBrightnessSlider = !showBrightnessSlider },
+            onClick = {
+              showBrightnessSlider = !showBrightnessSlider
+              showZoomSlider = false
+            },
             modifier = Modifier
               .size(36.dp)
               .clip(CircleShape)
@@ -308,63 +254,151 @@ fun MainScreen(
               modifier = Modifier.size(18.dp)
             )
           }
+
+          // Flashlight Toggle Button
+          IconButton(
+            onClick = {
+              isFlashlightOn = !isFlashlightOn
+              streamer.setFlashlightEnabled(isFlashlightOn)
+            },
+            modifier = Modifier
+              .size(36.dp)
+              .clip(CircleShape)
+              .background(GlassWhite)
+              .border(1.dp, GlassBorder, CircleShape)
+          ) {
+            Icon(
+              imageVector = if (isFlashlightOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+              contentDescription = "Flashlight",
+              tint = if (isFlashlightOn) Color(0xFFFFD700) else Color.White,
+              modifier = Modifier.size(18.dp)
+            )
+          }
+
+          // Settings Gear Button
+          IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier
+              .size(36.dp)
+              .clip(CircleShape)
+              .background(GlassWhite)
+              .border(1.dp, GlassBorder, CircleShape)
+          ) {
+            Icon(
+              imageVector = Icons.Default.Settings,
+              contentDescription = "Settings",
+              tint = Color.White,
+              modifier = Modifier.size(18.dp)
+            )
+          }
+
+          // Start / Stop Stream button
+          Box(
+            modifier = Modifier
+              .height(36.dp)
+              .clip(RoundedCornerShape(18.dp))
+              .background(if (isStreaming) LiveRed else LiveGreen)
+              .clickable { onToggleStream() }
+              .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(
+              text = if (isStreaming) "● STOP" else "GO LIVE",
+              color = Color.White,
+              fontSize = 12.sp,
+              fontWeight = FontWeight.Bold
+            )
+          }
         }
 
-        // Flashlight (Torch) Toggle
-        IconButton(
-          onClick = {
-            isFlashlightOn = !isFlashlightOn
-            streamer.setFlashlightEnabled(isFlashlightOn)
-          },
-          modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(GlassWhite)
-            .border(1.dp, GlassBorder, CircleShape)
-        ) {
-          Icon(
-            imageVector = if (isFlashlightOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-            contentDescription = "Flashlight",
-            tint = if (isFlashlightOn) Color(0xFFFFD700) else Color.White,
-            modifier = Modifier.size(18.dp)
-          )
-        }
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Settings Button
-        IconButton(
-          onClick = onOpenSettings,
-          modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(GlassWhite)
-            .border(1.dp, GlassBorder, CircleShape)
+        // Sliders Drawer (displays directly below their top-right control buttons)
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(16.dp),
+          modifier = Modifier.padding(end = 4.dp)
         ) {
-          Icon(
-            imageVector = Icons.Default.Settings,
-            contentDescription = "Settings",
-            tint = Color.White,
-            modifier = Modifier.size(18.dp)
-          )
-        }
+          // Zoom Slider Bubble
+          AnimatedVisibility(
+            visible = showZoomSlider,
+            enter = fadeIn(),
+            exit = fadeOut()
+          ) {
+            VerticalSliderBubble(
+              label = "ZOOM",
+              value = zoomLevel,
+              onValueChange = {
+                zoomLevel = it
+                streamer.setZoom(it)
+              }
+            )
+          }
 
-        // Start / Stop Stream button
-        Box(
-          modifier = Modifier
-            .height(36.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (isStreaming) LiveRed else LiveGreen)
-            .clickable { onToggleStream() }
-            .padding(horizontal = 16.dp),
-          contentAlignment = Alignment.Center
-        ) {
-          Text(
-            text = if (isStreaming) "● STOP" else "GO LIVE",
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-          )
+          // Brightness Slider Bubble
+          AnimatedVisibility(
+            visible = showBrightnessSlider,
+            enter = fadeIn(),
+            exit = fadeOut()
+          ) {
+            VerticalSliderBubble(
+              label = "BRIGHT",
+              value = brightnessLevel,
+              onValueChange = {
+                brightnessLevel = it
+                streamer.setScreenBrightness(it)
+              },
+              valueRange = 0.1f..1.0f
+            )
+          }
         }
       }
+    }
+  }
+}
+
+/**
+ * Reusable vertical slider bubble matching professional capsule design.
+ */
+@Composable
+private fun VerticalSliderBubble(
+  label: String,
+  value: Float,
+  onValueChange: (Float) -> Unit,
+  valueRange: ClosedFloatingPointRange<Float> = 0f..1f
+) {
+  Column(
+    horizontalAlignment = Alignment.CenterHorizontally,
+    modifier = Modifier
+      .width(44.dp)
+      .clip(RoundedCornerShape(22.dp))
+      .background(Color(0x77000000))
+      .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(22.dp))
+      .padding(vertical = 12.dp)
+  ) {
+    Text(
+      text = label,
+      color = Color.White.copy(alpha = 0.6f),
+      fontSize = 8.sp,
+      fontWeight = FontWeight.Bold
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Box(
+      modifier = Modifier.height(130.dp),
+      contentAlignment = Alignment.Center
+    ) {
+      Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        colors = SliderDefaults.colors(
+          thumbColor = Color.White,
+          activeTrackColor = Color.White,
+          inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+        ),
+        modifier = Modifier
+          .graphicsLayer { rotationZ = -90f }
+          .width(110.dp)
+      )
     }
   }
 }
