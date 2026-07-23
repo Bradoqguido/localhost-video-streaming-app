@@ -33,6 +33,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -356,9 +361,6 @@ fun MainScreen(
   }
 }
 
-/**
- * Reusable vertical slider bubble matching professional capsule design.
- */
 @Composable
 private fun VerticalSliderBubble(
   label: String,
@@ -371,7 +373,7 @@ private fun VerticalSliderBubble(
     modifier = Modifier
       .width(44.dp)
       .clip(RoundedCornerShape(22.dp))
-      .background(Color(0x77000000))
+      .background(Color(0x99000000))
       .border(0.5.dp, Color(0x33FFFFFF), RoundedCornerShape(22.dp))
       .padding(vertical = 12.dp)
   ) {
@@ -381,24 +383,63 @@ private fun VerticalSliderBubble(
       fontSize = 8.sp,
       fontWeight = FontWeight.Bold
     )
-    Spacer(modifier = Modifier.height(8.dp))
-    Box(
-      modifier = Modifier.height(130.dp),
-      contentAlignment = Alignment.Center
+    Spacer(modifier = Modifier.height(10.dp))
+    
+    // Custom vertical fader strip
+    BoxWithConstraints(
+      modifier = Modifier
+        .width(18.dp)
+        .height(130.dp)
+        .clip(RoundedCornerShape(9.dp))
+        .background(Color(0x33FFFFFF))
+        .pointerInput(valueRange, value) {
+          detectDragGestures { change, dragAmount ->
+            change.consume()
+            val height = size.height
+            val delta = -dragAmount.y / height
+            val rangeSpan = valueRange.endInclusive - valueRange.start
+            val newValue = (value + delta * rangeSpan).coerceIn(valueRange.start, valueRange.endInclusive)
+            onValueChange(newValue)
+          }
+        }
+        .pointerInput(valueRange) {
+          detectTapGestures { offset ->
+            val height = size.height
+            val ratio = 1f - (offset.y / height)
+            val rangeSpan = valueRange.endInclusive - valueRange.start
+            val newValue = (valueRange.start + ratio * rangeSpan).coerceIn(valueRange.start, valueRange.endInclusive)
+            onValueChange(newValue)
+          }
+        }
     ) {
-      Slider(
-        value = value,
-        onValueChange = onValueChange,
-        valueRange = valueRange,
-        colors = SliderDefaults.colors(
-          thumbColor = Color.White,
-          activeTrackColor = Color.White,
-          inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-        ),
+      val heightPx = constraints.maxHeight
+      val ratio = (value - valueRange.start) / (valueRange.endInclusive - valueRange.start)
+      val density = LocalDensity.current
+
+      // Active fill (drawn from bottom up)
+      Box(
         modifier = Modifier
-          .graphicsLayer { rotationZ = -90f }
-          .width(110.dp)
+          .fillMaxWidth()
+          .height(with(density) { (heightPx * ratio).toDp() })
+          .align(Alignment.BottomCenter)
+          .background(Color.White)
       )
+      
+      // Level indicator line
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(with(density) { (heightPx * ratio).toDp() })
+          .align(Alignment.BottomCenter)
+      ) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .align(Alignment.TopCenter)
+            .background(Color(0xFFFFD700))
+        )
+      }
     }
   }
 }
