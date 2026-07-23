@@ -388,7 +388,29 @@ private fun VerticalSliderBubble(
       fontSize = 8.sp,
       fontWeight = FontWeight.Bold
     )
-    Spacer(modifier = Modifier.height(10.dp))
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Plus (+) Button
+    Box(
+      modifier = Modifier
+        .size(28.dp)
+        .clip(CircleShape)
+        .clickable {
+          val rangeSpan = updatedRange.endInclusive - updatedRange.start
+          val newValue = (updatedValue + 0.05f * rangeSpan).coerceIn(updatedRange.start, updatedRange.endInclusive)
+          updatedOnValueChange(newValue)
+        },
+      contentAlignment = Alignment.Center
+    ) {
+      Text(
+        text = "+",
+        color = Color.White,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.Bold
+      )
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
     
     // Custom vertical fader strip
     BoxWithConstraints(
@@ -445,6 +467,28 @@ private fun VerticalSliderBubble(
             .background(Color(0xFFFFD700))
         )
       }
+    }
+
+    Spacer(modifier = Modifier.height(4.dp))
+
+    // Minus (-) Button
+    Box(
+      modifier = Modifier
+        .size(28.dp)
+        .clip(CircleShape)
+        .clickable {
+          val rangeSpan = updatedRange.endInclusive - updatedRange.start
+          val newValue = (updatedValue - 0.05f * rangeSpan).coerceIn(updatedRange.start, updatedRange.endInclusive)
+          updatedOnValueChange(newValue)
+        },
+      contentAlignment = Alignment.Center
+    ) {
+      Text(
+        text = "-",
+        color = Color.White,
+        fontSize = 18.sp,
+        fontWeight = FontWeight.Bold
+      )
     }
   }
 }
