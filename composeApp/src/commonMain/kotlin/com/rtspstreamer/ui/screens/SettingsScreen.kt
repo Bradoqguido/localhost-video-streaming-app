@@ -100,27 +100,6 @@ fun SettingsScreen(
         modifier = Modifier.fillMaxWidth(),
       )
 
-      // ── RTMP Server IP (for iOS) ──
-      SectionLabel("RTMP Server IP (iOS Only)")
-      OutlinedTextField(
-        value = rtmpServerIp,
-        onValueChange = { rtmpServerIp = it },
-        label = { Text("IP of PC running VLC/vMix RTMP server") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-      )
-
-      // ── Port ──
-      SectionLabel("RTSP Port")
-      OutlinedTextField(
-        value = port,
-        onValueChange = { port = it.filter { c -> c.isDigit() } },
-        label = { Text("Default: 8554") },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-      )
-
       // ── Resolution ──
       SectionLabel("Resolution")
       ResolutionSelector(
@@ -138,11 +117,11 @@ fun SettingsScreen(
           Button(
             onClick = { frameRate = fps },
             colors = ButtonDefaults.buttonColors(
-              containerColor = if (frameRate === fps)
+              containerColor = if (frameRate == fps)
                 MaterialTheme.colorScheme.primary
               else
                 MaterialTheme.colorScheme.surfaceContainer,
-              contentColor = if (frameRate === fps)
+              contentColor = if (frameRate == fps)
                 MaterialTheme.colorScheme.onPrimary
               else
                 MaterialTheme.colorScheme.onSurface,
