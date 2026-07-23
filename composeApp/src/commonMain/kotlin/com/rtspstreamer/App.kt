@@ -5,13 +5,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.rtspstreamer.domain.IRtspStreamer
 import com.rtspstreamer.domain.models.StreamConfig
-import com.rtspstreamer.domain.models.StreamState
 import com.rtspstreamer.ui.screens.MainScreen
 import com.rtspstreamer.ui.screens.SettingsScreen
 import com.rtspstreamer.ui.theme.RTSPStreamerTheme
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Root composable for the RTSP Streamer app.
@@ -21,12 +19,9 @@ import kotlinx.coroutines.flow.StateFlow
  */
 @Composable
 fun App(
-  streamState: StateFlow<StreamState>,
-  isMuted: StateFlow<Boolean>,
+  streamer: IRtspStreamer,
   currentConfig: StreamConfig,
   onToggleStream: () -> Unit,
-  onSwitchCamera: () -> Unit,
-  onToggleMute: () -> Unit,
   onConfigChanged: (StreamConfig) -> Unit,
   onCopyUrl: (String) -> Unit,
   onViewCreated: (Any) -> Unit,
@@ -42,11 +37,8 @@ fun App(
       )
     } else {
       MainScreen(
-        streamState = streamState,
-        isMuted = isMuted,
+        streamer = streamer,
         onToggleStream = onToggleStream,
-        onSwitchCamera = onSwitchCamera,
-        onToggleMute = onToggleMute,
         onOpenSettings = { showSettings = true },
         onCopyUrl = onCopyUrl,
         onViewCreated = onViewCreated,

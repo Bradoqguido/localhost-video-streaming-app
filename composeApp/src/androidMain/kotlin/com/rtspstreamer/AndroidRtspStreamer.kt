@@ -66,6 +66,22 @@ class AndroidRtspStreamer : IRtspStreamer {
   private val _isMuted = MutableStateFlow(false)
   override val isMicrophoneMuted: StateFlow<Boolean> = _isMuted.asStateFlow()
 
+  private val _isLevelStable = MutableStateFlow(true)
+  override val isLevelStable: StateFlow<Boolean> = _isLevelStable.asStateFlow()
+
+  private var sensorManager: android.hardware.SensorManager? = null
+  private val sensorListener = object : android.hardware.SensorEventListener {
+    override fun onSensorChanged(event: android.hardware.SensorEvent) {
+      if (event.sensor.type == android.hardware.Sensor.TYPE_ACCELEROMETER) {
+        val y = event.values[1] // Y-axis acceleration
+        // Stable if tilt is < 2 degrees (approx |y| < 0.35 m/s^2)
+        val isStable = java.lang.Math.abs(y) < 0.35f
+        _isLevelStable.value = isStable
+      }
+    }
+    override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+  }
+
   private var _config = StreamConfig()
   override val config: StreamConfig get() = _config
 
@@ -87,6 +103,15 @@ class AndroidRtspStreamer : IRtspStreamer {
 
     try {
       val context = view.context
+      
+      // Register accelerometer for stability monitoring
+      val sm = context.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager
+      sensorManager = sm
+      val accel = sm.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+      if (accel != null) {
+        sm.registerListener(sensorListener, accel, android.hardware.SensorManager.SENSOR_DELAY_UI)
+      }
+
       val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
       
       // Find back camera
@@ -180,6 +205,9 @@ class AndroidRtspStreamer : IRtspStreamer {
 
   override fun stopPreview() {
     try {
+      sensorManager?.unregisterListener(sensorListener)
+      sensorManager = null
+
       captureSession?.stopRepeating()
       captureSession?.close()
       captureSession = null
@@ -281,6 +309,71 @@ class AndroidRtspStreamer : IRtspStreamer {
     startPreview()
     if (wasStreaming) {
       startStreaming()
+    }
+  }
+
+  override fun setFlashlightEnabled(enabled: Boolean) {
+    val view = textureView ?: return
+    val context = view.context
+    val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+    try {
+      val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
+        val chars = cameraManager.getCameraCharacteristics(id)
+        chars.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
+      }
+      if (cameraId != null) {
+        cameraManager.setTorchMode(cameraId, enabled)
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error setting flashlight mode", e)
+    }
+  }
+
+  override fun setZoom(level: Float) {
+    val session = captureSession ?: return
+    val camera = cameraDevice ?: return
+    try {
+      val builder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+      val view = textureView ?: return
+      val surfaceTexture = view.surfaceTexture ?: return
+      surfaceTexture.setDefaultBufferSize(1280, 720)
+      val previewSurface = Surface(surfaceTexture)
+      val reader = imageReader ?: return
+      builder.addTarget(previewSurface)
+      builder.addTarget(reader.surface)
+      builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+      
+      val manager = view.context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+      val characteristics = manager.getCameraCharacteristics(camera.id)
+      val activeRect = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+      val maxZoom = characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM) ?: 1.0f
+      
+      if (activeRect != null) {
+        val currentZoom = 1.0f + (maxZoom - 1.0f) * level
+        val centerX = activeRect.centerX()
+        val centerY = activeRect.centerY()
+        val deltaX = (activeRect.width() / (2.0f * currentZoom)).toInt()
+        val deltaY = (activeRect.height() / (2.0f * currentZoom)).toInt()
+        
+        val cropRect = Rect(centerX - deltaX, centerY - deltaY, centerX + deltaX, centerY + deltaY)
+        builder.set(CaptureRequest.SCALER_CROP_REGION, cropRect)
+      }
+      
+      session.setRepeatingRequest(builder.build(), null, cameraHandler)
+    } catch (e: Exception) {
+      Log.e(TAG, "Zoom failed", e)
+    }
+  }
+
+  override fun setScreenBrightness(level: Float) {
+    val view = textureView ?: return
+    val context = view.context
+    if (context is android.app.Activity) {
+      context.runOnUiThread {
+        val layoutParams = context.window.attributes
+        layoutParams.screenBrightness = level
+        context.window.attributes = layoutParams
+      }
     }
   }
 

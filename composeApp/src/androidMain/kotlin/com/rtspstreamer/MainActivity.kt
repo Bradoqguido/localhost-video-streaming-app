@@ -51,8 +51,7 @@ class MainActivity : ComponentActivity() {
 
     setContent {
       App(
-        streamState = streamer.state,
-        isMuted = streamer.isMicrophoneMuted,
+        streamer = streamer,
         currentConfig = currentConfig,
         onToggleStream = {
           when (streamer.state.value) {
@@ -70,10 +69,6 @@ class MainActivity : ComponentActivity() {
               initializeStreamer()
             }
           }
-        },
-        onSwitchCamera = { streamer.switchCamera() },
-        onToggleMute = {
-          streamer.setMicrophoneMuted(!streamer.isMicrophoneMuted.value)
         },
         onConfigChanged = { newConfig ->
           currentConfig = newConfig

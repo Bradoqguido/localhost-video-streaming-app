@@ -20,8 +20,7 @@ fun MainViewController(): UIViewController {
 
   return ComposeUIViewController {
     App(
-      streamState = streamer.state,
-      isMuted = streamer.isMicrophoneMuted,
+      streamer = streamer,
       currentConfig = configState,
       onToggleStream = {
         when (streamer.state.value) {
@@ -29,10 +28,6 @@ fun MainViewController(): UIViewController {
           is StreamState.Streaming -> streamer.stopStreaming()
           else -> streamer.startPreview()
         }
-      },
-      onSwitchCamera = { streamer.switchCamera() },
-      onToggleMute = {
-        streamer.setMicrophoneMuted(!streamer.isMicrophoneMuted.value)
       },
       onConfigChanged = { newConfig ->
         streamer.updateConfig(newConfig)

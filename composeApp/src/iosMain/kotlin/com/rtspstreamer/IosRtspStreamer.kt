@@ -27,6 +27,9 @@ interface IosStreamerDelegate {
   fun switchCamera()
   fun setMicrophoneMuted(muted: Boolean)
   fun attachPreview(view: Any)
+  fun setFlashlightEnabled(enabled: Boolean)
+  fun setZoom(level: Float)
+  fun setScreenBrightness(level: Float)
 }
 
 class IosRtspStreamer : IRtspStreamer {
@@ -39,6 +42,9 @@ class IosRtspStreamer : IRtspStreamer {
 
   private val _isMuted = MutableStateFlow(false)
   override val isMicrophoneMuted: StateFlow<Boolean> = _isMuted.asStateFlow()
+
+  private val _isLevelStable = MutableStateFlow(true)
+  override val isLevelStable: StateFlow<Boolean> = _isLevelStable.asStateFlow()
 
   private var _config = StreamConfig()
   override val config: StreamConfig get() = _config
@@ -98,6 +104,22 @@ class IosRtspStreamer : IRtspStreamer {
   override fun updateConfig(newConfig: StreamConfig) {
     _config = newConfig
     delegate?.startPreview()
+  }
+
+  override fun setFlashlightEnabled(enabled: Boolean) {
+    delegate?.setFlashlightEnabled(enabled)
+  }
+
+  override fun setZoom(level: Float) {
+    delegate?.setZoom(level)
+  }
+
+  override fun setScreenBrightness(level: Float) {
+    delegate?.setScreenBrightness(level)
+  }
+
+  fun updateLevelStable(stable: Boolean) {
+    _isLevelStable.value = stable
   }
 
   override fun release() {

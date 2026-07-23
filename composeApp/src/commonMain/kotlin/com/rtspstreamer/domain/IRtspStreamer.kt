@@ -46,6 +46,18 @@ interface IRtspStreamer {
   /** Update streaming configuration. Requires restart if currently streaming. */
   fun updateConfig(newConfig: StreamConfig)
 
+  /** Toggle flashlight. */
+  fun setFlashlightEnabled(enabled: Boolean)
+
+  /** Set camera zoom level (0.0 to 1.0). */
+  fun setZoom(level: Float)
+
+  /** Set screen brightness (0.0 to 1.0). */
+  fun setScreenBrightness(level: Float)
+
+  /** Level stability flow. */
+  val isLevelStable: StateFlow<Boolean>
+
   /** Release all resources. Call when done. */
   fun release()
 }
